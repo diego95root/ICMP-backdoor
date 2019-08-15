@@ -10,6 +10,7 @@ import argparse
 #
 # maybe option to add a reverse shell: server on client, receives
 # data from pings, sends back data with pings.
+# option to set time difference on TimeBased
 
 def dataFile(filename):
     f = open(filename, "r")
