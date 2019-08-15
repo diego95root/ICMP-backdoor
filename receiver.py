@@ -79,12 +79,14 @@ def serverTimeBased(interface):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Client that sends data disguised in ICMP packets. Keep in mind settings need to be the same for the server')
-    parser.add_argument('-i', '--interface', type=str, help='interface to listen on')
     parser.add_argument('-o', '--out', type=str, help='write received data on a file')
     parser.add_argument('-m', '--mode', type=int, default=1, help='the mode of exfiltration: 1 is lousy (inside packets), 2 time-based')
+
+    requiredNamed = parser.add_argument_group('required named arguments')
+    parser.add_argument('-i', '--interface', type=str, help='interface to listen on', required=True)
+
     args = parser.parse_args()
 
-    # make interface necessary
     print "[*] Started listener on interface: {}".format(args.interface)
     print "[*] Listening mode: {}".format(args.mode)
 
